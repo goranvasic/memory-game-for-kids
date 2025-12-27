@@ -1,0 +1,347 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <title>Memory game cards</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+
+  <!-- Pyodide -->
+  <script src="https://cdn.jsdelivr.net/pyodide/v0.26.2/full/pyodide.js"></script>
+
+  <style>
+    :root{
+      --bg1:#0a3c54;
+      --bg2:#072f43;
+      --card:#eaf6ff;
+      --title:#f2b21b;
+      --btn:#2bd9c3;
+      --btnText:#063a34;
+    }
+
+    body{
+      margin:0;
+      min-height:100vh;
+      display:grid;
+      place-items:center;
+      font-family:system-ui, sans-serif;
+      background:
+        radial-gradient(1200px 600px at 20% 10%, rgba(255,255,255,.1), transparent 60%),
+        linear-gradient(180deg,var(--bg1),var(--bg2));
+      color:white;
+    }
+
+    .wrap{
+      width:min(860px,92vw);
+      text-align:center;
+      padding:24px;
+    }
+
+    h1{
+      color:var(--title);
+      font-size:clamp(28px,5vw,52px);
+      margin-bottom:12px;
+      font-weight:800;
+    }
+
+    .meta{
+      display:flex;
+      gap:12px;
+      justify-content:center;
+      margin-bottom:12px;
+    }
+
+    .pill{
+      padding:6px 12px;
+      border-radius:999px;
+      background:rgba(255,255,255,.15);
+      font-size:14px;
+    }
+
+    .grid{
+      display:grid;
+      grid-template-columns:repeat(4,1fr);
+      gap:16px;
+      max-width:720px;
+      margin:0 auto;
+    }
+
+    .grid.grid-hidden{
+      display:none;
+    }
+
+    .card{
+      aspect-ratio:1;
+      background:rgba(255,255,255,.12);
+      border-radius:14px;
+      display:grid;
+      place-items:center;
+      cursor:pointer;
+    }
+
+    .face{
+      width:82%;
+      height:82%;
+      background:var(--card);
+      border-radius:12px;
+      display:grid;
+      place-items:center;
+      font-size:40px;
+      color:#0b2f3f;
+    }
+
+    .hidden .face{
+      background:rgba(255,255,255,.08);
+      color:transparent;
+      position:relative;
+    }
+
+    .hidden .face::after{
+      content:"★";
+      color:white;
+      font-size:24px;
+    }
+
+    .matched{
+      pointer-events:none;
+      filter:saturate(1.2);
+    }
+
+    button{
+      margin-top:14px;
+      padding:12px 18px;
+      border-radius:12px;
+      border:none;
+      background:var(--btn);
+      color:var(--btnText);
+      font-weight:800;
+      cursor:pointer;
+    }
+
+    .status{
+      min-height:20px;
+      margin-top:8px;
+      font-size:14px;
+    }
+
+    .final-score{
+      display:none;
+      max-width:720px;
+      margin:0 auto;
+      padding:48px 24px;
+      border-radius:18px;
+      background:rgba(0,0,0,.25);
+      font-size:clamp(22px,4vw,40px);
+      font-weight:700;
+      letter-spacing:0.5px;
+    }
+
+    .final-score.visible{
+      display:flex;
+      align-items:center;
+      justify-content:center;
+    }
+
+    @media(max-width:520px){
+      .grid{grid-template-columns:repeat(3,1fr);}
+    }
+  </style>
+</head>
+
+<body>
+<div class="wrap">
+  <h1>Memory game cards</h1>
+
+  <div class="meta">
+    <div class="pill">Moves: <span id="moves">0</span></div>
+    <div class="pill">Matched: <span id="matched">0</span>/6</div>
+  </div>
+
+  <div id="grid" class="grid"></div>
+
+  <div id="finalScore" class="final-score" aria-live="polite"></div>
+
+  <div id="status" class="status"></div>
+
+  <button id="restartBtn" disabled>Restart game</button>
+  <div id="loading">Loading Python runtime…</div>
+</div>
+
+<!-- ================= PYTHON CODE ================= -->
+<script type="text/python" id="py-code">
+import random
+import asyncio
+from js import document
+
+PAIRS = 6
+PREVIEW_SECONDS = 3.5
+MISMATCH_DELAY = 0.6
+SYMBOLS = ["🥦","🍋","🥕","🧅","🥬","🍊"]
+
+deck = []
+revealed = set()
+matched = set()
+first_pick = None
+lock = False
+moves = 0
+
+grid = document.querySelector("#grid")
+moves_el = document.querySelector("#moves")
+matched_el = document.querySelector("#matched")
+status_el = document.querySelector("#status")
+final_score_el = document.querySelector("#finalScore")
+
+def update_meta():
+    moves_el.innerText = str(moves)
+    matched_el.innerText = str(len(matched)//2)
+
+def set_status(t=""):
+    status_el.innerText = t
+
+def new_deck():
+    d = SYMBOLS[:PAIRS] * 2
+    random.shuffle(d)
+    return d
+
+def build_card(idx, sym):
+    c = document.createElement("div")
+    c.classList.add("card","hidden")
+    c.setAttribute("data-idx",str(idx))
+
+    f = document.createElement("div")
+    f.classList.add("face")
+    f.innerText = sym
+
+    c.appendChild(f)
+    return c
+
+def render():
+    grid.innerHTML = ""
+    for i,s in enumerate(deck):
+        grid.appendChild(build_card(i,s))
+
+def card(idx):
+    return grid.querySelector(f'[data-idx="{idx}"]')
+
+def show(idx):
+    card(idx).classList.remove("hidden")
+
+def hide(idx):
+    card(idx).classList.add("hidden")
+
+def mark(i,j):
+    matched.update([i,j])
+    for k in (i,j):
+        c = card(k)
+        c.classList.remove("hidden")
+        c.classList.add("matched")
+
+def show_board():
+    grid.classList.remove("grid-hidden")
+    final_score_el.classList.remove("visible")
+    final_score_el.innerText = ""
+
+def display_final_score():
+    grid.classList.add("grid-hidden")
+    final_score_el.innerText = f"All pairs matched in {moves} moves."
+    final_score_el.classList.add("visible")
+
+async def resolve(i,j):
+    global lock, first_pick, moves
+    lock = True
+    moves += 1
+    update_meta()
+
+    if deck[i] == deck[j]:
+        mark(i,j)
+        set_status("Match!")
+    else:
+        set_status("Nope.")
+        await asyncio.sleep(MISMATCH_DELAY)
+        hide(i); hide(j)
+
+    first_pick = None
+    lock = False
+
+    if len(matched) == len(deck):
+      display_final_score()
+      set_status("")
+
+def on_card_click(event):
+    global first_pick
+    if lock:
+        return
+
+    el = event.target
+    card_el = el if el.hasAttribute("data-idx") else el.parentElement
+    if not card_el or not card_el.hasAttribute("data-idx"):
+        return
+
+    idx = int(card_el.getAttribute("data-idx"))
+    if idx in matched or idx in revealed:
+        return
+
+    revealed.add(idx)
+    show(idx)
+
+    if first_pick is None:
+        first_pick = idx
+    else:
+        i = first_pick
+        revealed.clear()
+        asyncio.ensure_future(resolve(i,idx))
+
+async def preview():
+    for i in range(len(deck)):
+        show(i)
+    set_status("Preview…")
+    await asyncio.sleep(PREVIEW_SECONDS)
+    for i in range(len(deck)):
+        if i not in matched:
+            hide(i)
+    set_status("Go!")
+
+def restart():
+    global deck, revealed, matched, first_pick, lock, moves
+    deck = new_deck()
+    revealed.clear()
+    matched.clear()
+    first_pick = None
+    lock = False
+    moves = 0
+    update_meta()
+    render()
+    show_board()
+    asyncio.ensure_future(preview())
+
+def init():
+    restart()
+</script>
+
+<!-- ================= JAVASCRIPT BOOTSTRAP ================= -->
+<script>
+let pyodide;
+let onCardClickPy;
+
+async function main(){
+  pyodide = await loadPyodide();
+  await pyodide.runPythonAsync(
+    document.getElementById("py-code").textContent
+  );
+  await pyodide.runPythonAsync("init()");
+
+  const grid = document.getElementById("grid");
+
+  onCardClickPy = pyodide.globals.get("on_card_click");
+  grid.addEventListener("click", ev => onCardClickPy(ev));
+
+  document.getElementById("restartBtn").onclick = () =>
+    pyodide.runPythonAsync("restart()");
+
+  document.getElementById("restartBtn").disabled = false;
+  document.getElementById("loading").textContent = "";
+}
+
+main();
+</script>
+</body>
+</html>
