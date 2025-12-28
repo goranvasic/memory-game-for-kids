@@ -1,417 +1,327 @@
 <!doctype html>
 <html lang="en">
 <head>
-  <meta charset="utf-8"/>
-  <title>Memory game cards</title>
-  <meta name="viewport" content="width=device-width, initial-scale=1"/>
+    <meta charset="utf-8"/>
+    <title>Memory game cards</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1"/>
+    <script src="https://cdn.jsdelivr.net/npm/@hiseb/confetti@2.1.0/dist/confetti.min.js"></script>
 
-  <script src="https://cdn.jsdelivr.net/npm/confetti-js@0.0.18/dist/index.min.js"></script>
+    <style>
+        :root {
+            --bg1: #0a3c54;
+            --bg2: #072f43;
+            --card: #eaf6ff;
+            --title: #f2b21b;
+            --btn: #2bd9c3;
+            --btnText: #063a34;
+        }
 
-  <style>
-    .card-confetti {
-      position: absolute;
-      pointer-events: none;
-      mix-blend-mode: screen;
-      animation: firework-pop 1s ease-out forwards;
-      filter: drop-shadow(0 0 12px rgba(255, 255, 255, .45));
-    }
-  </style>
+        body {
+            margin: 0;
+            min-height: 100vh;
+            display: grid;
+            place-items: center;
+            font-family: system-ui, sans-serif;
+            color: white;
+            background: radial-gradient(1200px 600px at 20% 10%, rgba(255, 255, 255, .1), transparent 60%),
+            linear-gradient(180deg, var(--bg1), var(--bg2));
+        }
 
-  <style>
-    :root {
-      --bg1: #0a3c54;
-      --bg2: #072f43;
-      --card: #eaf6ff;
-      --title: #f2b21b;
-      --btn: #2bd9c3;
-      --btnText: #063a34;
-    }
+        .wrap {
+            width: min(860px, 92vw);
+            text-align: center;
+            padding: 24px;
+        }
 
-    body {
-      margin: 0;
-      min-height: 100vh;
-      display: grid;
-      place-items: center;
-      font-family: system-ui, sans-serif;
-      background: radial-gradient(1200px 600px at 20% 10%, rgba(255, 255, 255, .1), transparent 60%),
-      linear-gradient(180deg, var(--bg1), var(--bg2));
-      color: white;
-    }
+        h1 {
+            color: var(--title);
+            font-size: clamp(28px, 5vw, 52px);
+            margin: 0 0 12px;
+            font-weight: 800;
+        }
 
-    .wrap {
-      width: min(860px, 92vw);
-      text-align: center;
-      padding: 24px;
-    }
+        .meta {
+            display: flex;
+            gap: 12px;
+            justify-content: center;
+            margin-bottom: 12px;
+        }
 
-    h1 {
-      color: var(--title);
-      font-size: clamp(28px, 5vw, 52px);
-      margin-bottom: 12px;
-      font-weight: 800;
-    }
+        .pill {
+            padding: 6px 12px;
+            border-radius: 999px;
+            background: rgba(255, 255, 255, .15);
+            font-size: 14px;
+        }
 
-    .meta {
-      display: flex;
-      gap: 12px;
-      justify-content: center;
-      margin-bottom: 12px;
-    }
+        .grid {
+            display: grid;
+            grid-template-columns: repeat(4, 1fr);
+            gap: 16px;
+            max-width: 720px;
+            margin: 0 auto;
+        }
 
-    .pill {
-      padding: 6px 12px;
-      border-radius: 999px;
-      background: rgba(255, 255, 255, .15);
-      font-size: 14px;
-    }
+        .grid.hidden {
+            display: none;
+        }
 
-    .grid {
-      display: grid;
-      grid-template-columns: repeat(4, 1fr);
-      gap: 16px;
-      max-width: 720px;
-      margin: 0 auto;
-    }
+        .card {
+            aspect-ratio: 1;
+            background: rgba(255, 255, 255, .12);
+            border-radius: 14px;
+            display: grid;
+            place-items: center;
+            cursor: pointer;
+            position: relative;
+            overflow: visible;
+            --front-color: var(--card);
+        }
 
-    .grid.grid-hidden {
-      display: none;
-    }
+        .face {
+            width: 82%;
+            height: 82%;
+            border-radius: 12px;
+            display: grid;
+            place-items: center;
+            font-size: 40px;
+            color: #0b2f3f;
+            background: var(--front-color, var(--card));
+        }
 
-    .card {
-      --front-color: var(--card);
-      aspect-ratio: 1;
-      background: rgba(255, 255, 255, .12);
-      border-radius: 14px;
-      display: grid;
-      place-items: center;
-      cursor: pointer;
-      position: relative;
-      overflow: visible; /* let confetti be visible outside */
-    }
+        .card.hidden .face {
+            background: rgba(255, 255, 255, .08);
+            color: transparent;
+        }
 
-    @keyframes firework-pop {
-      0% { transform: scale(.35); opacity: 0; }
-      15% { opacity: 1; }
-      100% { transform: scale(1.25); opacity: 0; }
-    }
+        .card.hidden .face::after {
+            content: "★";
+            color: white;
+            font-size: 24px;
+        }
 
-    .face {
-      width: 82%;
-      height: 82%;
-      border-radius: 12px;
-      display: grid;
-      place-items: center;
-      font-size: 40px;
-      color: #0b2f3f;
-      background: var(--front-color, var(--card)); /* only front differs */
-    }
+        .matched {
+            pointer-events: none;
+            filter: saturate(1.2);
+        }
 
-    .hidden .face {
-      background: rgba(255, 255, 255, .08); /* backside stays the same */
-      color: transparent;
-      position: relative;
-    }
+        .matched .face {
+            animation: match-highlight 1s ease-out forwards;
+        }
 
-    .hidden .face::after {
-      content: "★";
-      color: white;
-      font-size: 24px;
-    }
+        @keyframes match-highlight {
+            from {
+                background-color: white;
+            }
+            to {
+                background-color: color-mix(in srgb, var(--front-color), rgba(255, 255, 255, .08) 50%);
+            }
+        }
 
-    .matched {
-      pointer-events: none;
-      filter: saturate(1.2);
-    }
+        .card-confetti {
+            position: absolute;
+            pointer-events: none;
+            mix-blend-mode: screen;
+            animation: firework-pop 1s ease-out forwards;
+            filter: drop-shadow(0 0 12px rgba(255, 255, 255, .45));
+        }
 
-    button {
-      margin-top: 14px;
-      padding: 12px 18px;
-      border-radius: 12px;
-      border: none;
-      background: var(--btn);
-      color: var(--btnText);
-      font-weight: 800;
-      cursor: pointer;
-    }
+        @keyframes firework-pop {
+            0% {
+                transform: scale(.35);
+                opacity: 0;
+            }
+            15% {
+                opacity: 1;
+            }
+            100% {
+                transform: scale(1.25);
+                opacity: 0;
+            }
+        }
 
-    .status {
-      min-height: 20px;
-      margin-top: 8px;
-      font-size: 14px;
-    }
+        button {
+            margin-top: 14px;
+            padding: 12px 18px;
+            border-radius: 12px;
+            border: none;
+            background: var(--btn);
+            color: var(--btnText);
+            font-weight: 800;
+            cursor: pointer;
+        }
 
-    .final-score {
-      display: none;
-      max-width: 720px;
-      margin: 0 auto;
-      padding: 48px 24px;
-      border-radius: 18px;
-      background: rgba(0, 0, 0, .25);
-      font-size: clamp(22px, 4vw, 40px);
-      font-weight: 700;
-      letter-spacing: 0.5px;
-    }
+        .status {
+            min-height: 20px;
+            margin-top: 8px;
+            font-size: 14px;
+        }
 
-    .final-score.visible {
-      display: flex;
-      align-items: center;
-      justify-content: center;
-    }
+        .final-score {
+            display: none;
+            max-width: 720px;
+            margin: 0 auto;
+            padding: 48px 24px;
+            border-radius: 18px;
+            background: rgba(0, 0, 0, .25);
+            font-size: clamp(22px, 4vw, 40px);
+            font-weight: 700;
+        }
 
-    @media (max-width: 520px) {
-      .grid { grid-template-columns: repeat(3, 1fr); }
-    }
-  </style>
+        .final-score.visible {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        @media (max-width: 520px) {
+            .grid {
+                grid-template-columns: repeat(3, 1fr);
+            }
+        }
+    </style>
 </head>
-
 <body>
-  <div class="wrap">
+<div class="wrap">
     <h1>Memory game cards</h1>
-
     <div class="meta">
-      <div class="pill">Moves: <span id="moves">0</span></div>
-      <div class="pill">Matched: <span id="matched">0</span>/6</div>
+        <div class="pill">Moves: <span id="moves">0</span></div>
+        <div class="pill">Matched: <span id="matched">0</span>/6</div>
     </div>
-
     <div id="grid" class="grid"></div>
     <div id="finalScore" class="final-score" aria-live="polite"></div>
     <div id="status" class="status"></div>
-
     <button id="restartBtn">Restart game</button>
-  </div>
+</div>
 
-  <script>
-    // --- Config ---
-    const PAIRS = 6;
-    const PREVIEW_SECONDS = 3.5;
-    const MISMATCH_DELAY = 0.6;
+<script>
 
-    const SYMBOLS = ["🥦","🍋","🥕","🧅","🥬","🍊"];
-    const PAIR_COLORS = ["#ff8fab","#ffd166","#80ed99","#64dfdf","#c77dff","#ffba93"];
+    const PAIRS = 6, PREVIEW_SEC = 3.5, MISMATCH_SEC = 0.6;
+    const SYMBOLS = ["🥦", "🍋", "🥕", "🧅", "🥬", "🍊"];
+    const COLORS = ["#3fdcc3", "#fdffd4", "#cd68b1", "#6c7e9a", "#62a7d7", "#d89987"];
+    const COLOR_MAP = Object.fromEntries(SYMBOLS.slice(0, PAIRS).map((s, i) => [s, COLORS[i]]));
 
-    const SYMBOL_COLOR_MAP = Object.fromEntries(
-      SYMBOLS.slice(0, PAIRS).map((sym, i) => [sym, PAIR_COLORS[i % PAIR_COLORS.length]])
-    );
+    let deck = [], revealed = new Set(), matched = new Set(), firstPick = null, lock = false, moves = 0;
+    const els = {
+        grid: document.getElementById("grid"), moves: document.getElementById("moves"),
+        matched: document.getElementById("matched"), status: document.getElementById("status"),
+        score: document.getElementById("finalScore")
+    };
 
-    // --- State ---
-    let deck = [];
-    let revealed = new Set();
-    let matched = new Set();
-    let firstPick = null;
-    let lock = false;
-    let moves = 0;
-
-    // --- DOM ---
-    const grid = document.getElementById("grid");
-    const movesEl = document.getElementById("moves");
-    const matchedEl = document.getElementById("matched");
-    const statusEl = document.getElementById("status");
-    const finalScoreEl = document.getElementById("finalScore");
-    const restartBtn = document.getElementById("restartBtn");
-
-    function updateMeta() {
-      movesEl.textContent = String(moves);
-      matchedEl.textContent = String(matched.size / 2);
-    }
-
-    function setStatus(t = "") {
-      statusEl.textContent = t;
-    }
+    const sleep = s => new Promise(r => setTimeout(r, s * 1000));
+    const updateMeta = () => {
+        els.moves.textContent = moves;
+        els.matched.textContent = matched.size / 2;
+    };
+    const setStatus = t => els.status.textContent = t;
+    const cardEl = idx => els.grid.querySelector(`[data-idx="${idx}"]`);
+    const toggle = (idx, hide) => cardEl(idx)?.classList.toggle("hidden", hide);
 
     function newDeck() {
-      const d = [...SYMBOLS.slice(0, PAIRS), ...SYMBOLS.slice(0, PAIRS)];
-      for (let i = d.length - 1; i > 0; i--) {
-        const j = Math.floor(Math.random() * (i + 1));
-        [d[i], d[j]] = [d[j], d[i]];
-      }
-      return d;
-    }
-
-    function buildCard(idx, sym) {
-      const c = document.createElement("div");
-      c.classList.add("card", "hidden");
-      c.dataset.idx = String(idx);
-      c.style.setProperty("--front-color", SYMBOL_COLOR_MAP[sym] ?? "var(--card)");
-
-      const f = document.createElement("div");
-      f.classList.add("face");
-      f.textContent = sym;
-
-      c.appendChild(f);
-      return c;
+        const d = [...SYMBOLS.slice(0, PAIRS), ...SYMBOLS.slice(0, PAIRS)];
+        for (let i = d.length - 1; i > 0; i--) {
+            const j = Math.floor(Math.random() * (i + 1));
+            [d[i], d[j]] = [d[j], d[i]];
+        }
+        return d;
     }
 
     function render() {
-      grid.innerHTML = "";
-      deck.forEach((sym, i) => grid.appendChild(buildCard(i, sym)));
+        els.grid.innerHTML = deck.map((sym, i) => `
+        <div class="card hidden" data-idx="${i}" style="--front-color: ${COLOR_MAP[sym]}">
+          <div class="face">${sym}</div>
+        </div>`).join('');
     }
 
-    function cardEl(idx) {
-      return grid.querySelector(`[data-idx="${idx}"]`);
-    }
-
-    function show(idx) {
-      const el = cardEl(idx);
-      if (el) el.classList.remove("hidden");
-    }
-
-    function hide(idx) {
-      const el = cardEl(idx);
-      if (el) el.classList.add("hidden");
-    }
-
-    function showBoard() {
-      grid.classList.remove("grid-hidden");
-      finalScoreEl.classList.remove("visible");
-      finalScoreEl.textContent = "";
-    }
-
-    function displayFinalScore() {
-      grid.classList.add("grid-hidden");
-      finalScoreEl.textContent = `All pairs matched in ${moves} moves.`;
-      finalScoreEl.classList.add("visible");
-    }
-
-    // Confetti-js “Click here!” style: create a canvas and run a short burst.
-    // Keep shapes as squares and do not stretch via CSS (only scale canvas size).
-    function runCardConfetti(idx) {
-      const card = grid.querySelector(`[data-idx="${idx}"]`);
-      if (!card) return;
-
-      const scale = 1.35;
-      const { width, height } = card.getBoundingClientRect();
-      const canvasSize = Math.round(Math.max(width, height) * scale);
-
-      const canvas = document.createElement("canvas");
-      canvas.className = "card-confetti";
-      canvas.width = canvasSize;
-      canvas.height = canvasSize;
-      canvas.style.width = `${canvasSize}px`;
-      canvas.style.height = `${canvasSize}px`;
-      canvas.style.left = `${(width - canvasSize) / 2}px`;
-      canvas.style.top = `${(height - canvasSize) / 2}px`;
-      // Ensure confetti is in front of the card content
-      canvas.style.zIndex = "10";
-
-      const canvasId = `card-confetti-${idx}-${Date.now()}`;
-      canvas.id = canvasId;
-      card.appendChild(canvas);
-
-      const confetti = new ConfettiGenerator({
-        target: canvasId,
-        max: 90,
-        size: 1.1,
-        animate: true,
-        props: ["square"],
-        colors: [
-          [165, 104, 246],
-          [230, 61, 135],
-          [0, 199, 228],
-          [253, 214, 126]
-        ],
-        clock: 25,
-        rotate: true,
-        start_from_edge: false,
-        respawn: true
-      });
-
-      confetti.render();
-
-      window.setTimeout(() => {
-        confetti.clear();
-        canvas.remove();
-      }, 1500);
-    }
-
-    function mark(i, j) {
-      matched.add(i);
-      matched.add(j);
-
-      [i, j].forEach((k) => {
-        const c = cardEl(k);
-        if (!c) return;
-        c.classList.remove("hidden");
-        c.classList.add("matched");
-        runCardConfetti(k);
-      });
-
-      updateMeta();
+    function runConfetti(xPos, yPos, count = 25) {
+        confetti({
+            position: {x: xPos, y: yPos},	// Origin position
+            count: count,			// Number of particles
+            size: 1,			// Size of the particles
+            velocity: 100,		// Initial particle velocity
+            fade: true,			// Particles fall off the screen, or fade out
+        });
     }
 
     async function resolve(i, j) {
-      lock = true;
-      moves += 1;
-      updateMeta();
-
-      if (deck[i] === deck[j]) {
-        mark(i, j);
-        setStatus("Match!");
-      } else {
-        setStatus("Nope.");
-        await new Promise(r => window.setTimeout(r, Math.round(MISMATCH_DELAY * 1000)));
-        hide(i);
-        hide(j);
-      }
-
-      firstPick = null;
-      revealed.clear();
-      lock = false;
-
-      if (matched.size === deck.length) {
-        displayFinalScore();
-        setStatus("");
-      }
+        lock = true;
+        moves++;
+        updateMeta();
+        if (deck[i] === deck[j]) {
+            matched.add(i);
+            matched.add(j);
+            updateMeta();
+            [i, j].forEach(k => {
+                toggle(k, false);
+                const c = cardEl(k);
+                c.classList.add("matched");
+                const r = c.getBoundingClientRect();
+                runConfetti(r.left + r.width / 2, r.top + r.height / 2);
+            });
+            setStatus("Match!");
+        } else {
+            setStatus("Nope.");
+            await sleep(MISMATCH_SEC);
+            toggle(i, true);
+            toggle(j, true);
+        }
+        firstPick = null;
+        revealed.clear();
+        lock = false;
+        if (matched.size === deck.length) {
+            for (let k = 0; k < deck.length; k++) {
+                const f = cardEl(k).querySelector('.face');
+                f.style.animation = 'none';
+                f.offsetHeight; /* trigger reflow */
+                f.style.animation = 'match-highlight 1s ease-out forwards';
+                await sleep(0.2);
+            }
+            els.grid.classList.add("hidden");
+            els.score.textContent = `All pairs matched in ${moves} moves.`;
+            els.score.classList.add("visible");
+            setStatus("");
+            for (let k = 0; k < 7; k++) {
+                runConfetti(Math.random() * window.innerWidth, Math.random() * window.innerHeight, 150);
+                await sleep(0.6);
+            }
+        }
     }
 
-    async function preview() {
-      for (let i = 0; i < deck.length; i++) show(i);
-      setStatus("Preview…");
-      await new Promise(r => window.setTimeout(r, Math.round(PREVIEW_SECONDS * 1000)));
-      for (let i = 0; i < deck.length; i++) {
-        if (!matched.has(i)) hide(i);
-      }
-      setStatus("Go!");
+    async function restart() {
+        deck = newDeck();
+        revealed.clear();
+        matched.clear();
+        firstPick = null;
+        lock = false;
+        moves = 0;
+        updateMeta();
+        render();
+        els.grid.classList.remove("hidden");
+        els.score.classList.remove("visible");
+
+        deck.forEach((_, i) => toggle(i, false)); // Show all
+        setStatus("Preview…");
+        await sleep(PREVIEW_SEC);
+        deck.forEach((_, i) => toggle(i, true)); // Hide all
+        setStatus("Go!");
     }
 
-    function restart() {
-      deck = newDeck();
-      revealed.clear();
-      matched.clear();
-      firstPick = null;
-      lock = false;
-      moves = 0;
+    els.grid.addEventListener("click", e => {
+        if (lock) return;
+        const card = e.target.closest(".card");
+        const idx = Number(card?.dataset.idx);
+        if (!card || isNaN(idx) || matched.has(idx) || revealed.has(idx)) return;
 
-      updateMeta();
-      render();
-      showBoard();
-      preview();
-    }
+        revealed.add(idx);
+        toggle(idx, false);
 
-    function onGridClick(ev) {
-      if (lock) return;
+        if (firstPick === null) firstPick = idx;
+        else resolve(firstPick, idx);
+    });
 
-      const card = ev.target.closest?.(".card");
-      if (!card) return;
-
-      const idx = Number(card.dataset.idx);
-      if (!Number.isFinite(idx)) return;
-      if (matched.has(idx) || revealed.has(idx)) return;
-
-      revealed.add(idx);
-      show(idx);
-
-      if (firstPick === null) {
-        firstPick = idx;
-      } else {
-        const i = firstPick;
-        resolve(i, idx);
-      }
-    }
-
-    grid.addEventListener("click", onGridClick);
-    restartBtn.addEventListener("click", restart);
-
+    document.getElementById("restartBtn").addEventListener("click", restart);
+    document.addEventListener("contextmenu", e => e.preventDefault());
     restart();
-  </script>
+</script>
 </body>
 </html>
