@@ -87,6 +87,7 @@
             font-size: 40px;
             color: #0b2f3f;
             background: var(--front-color, var(--card));
+            box-shadow: inset 0 0 0 2px rgba(255, 255, 255, 0.1);
         }
 
         .card.hidden .face {
@@ -198,7 +199,7 @@
 
     const PAIRS = 6, PREVIEW_SEC = 3.5, MISMATCH_SEC = 0.6;
     const SYMBOLS = ["🥦", "🍋", "🥕", "🧅", "🥬", "🍊"];
-    const COLORS = ["#3fdcc3", "#fdffd4", "#cd68b1", "#6c7e9a", "#62a7d7", "#d89987"];
+    const COLORS = ["#4FE0C1", "#FFF6B3", "#E27BB9", "#eaead6", "#6EB6E8", "#E6A08A"];
     const COLOR_MAP = Object.fromEntries(SYMBOLS.slice(0, PAIRS).map((s, i) => [s, COLORS[i]]));
 
     let deck = [], revealed = new Set(), matched = new Set(), firstPick = null, lock = false, moves = 0;
